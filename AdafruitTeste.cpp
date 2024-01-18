@@ -17,6 +17,9 @@ void setup() {
 		delay(INTERVAL);
 	Serial.println("Porta série do PC configurada!");
 
+	// Periodo de espera para dar tempo ao sensor arrancar
+	delay(INTERVAL);
+
 	// Configuração para a porta de comunicação série com o sensor
 	pmSerial.begin(9600);
 	if (!pms.begin_UART(&pmSerial)) {
