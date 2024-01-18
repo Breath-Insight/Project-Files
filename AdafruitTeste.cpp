@@ -18,8 +18,8 @@ void setup() {
 	Serial.println("Porta série do PC configurada!");
 
 	// Configuração para a porta de comunicação série com o sensor
-	pmsSerial.begin(9600);
-	if (!pms.begin_UART(&pmsSerial)) {
+	pmSerial.begin(9600);
+	if (!pms.begin_UART(&pmSerial)) {
 		Serial.println("Não foi encontrado um sensor de PM2.5");
 		while(1)
 			delay(INTERVAL);
