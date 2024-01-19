@@ -1,91 +1,107 @@
+/*!
+ * @file  SEN0177.ino
+ * @brief Abstract: Read value of PM1,PM2.5 and PM10 of air quality
+ * @n The RX pin on the sensor connects to pin 11 on the Arduino
+ * @n The TX pin on the sensor connects to pin 10 on the Arduino
+ * @copyright  Copyright (c) 2010 DFRobot Co.Ltd (http://www.dfrobot.com)
+ * @license  The MIT License (MIT)
+ * @author  Zuyang @ HUST
+ * @version  V3.0
+ * @date  2016-03-25
+ */
+#include <Arduino.h>
 #include <SoftwareSerial.h>
 
-unsigned long intervalo = 1000; //intervalo de tempo entre amostras
+#define LENG 31   //0x42 + 31 bytes equal to 32 bytes
+unsigned char buf[LENG];
 
-//Variaveis do sensor de PMs
-SoftwareSerial pmsSerial(2, 3);
+int PM01Value=0;          //define PM1.0 value of the air detector module
+int PM2_5Value=0;         //define PM2.5 value of the air detector module
+int PM10Value=0;         //define PM10 value of the air detector module
 
-//Variaveis Teste
-#define LENGTH 31 //Numero de valores(bytes) que o sensor envia - 1
-unsigned char buff[LENGTH]; //Buffer que contem os valores enviados pelo sensor
+SoftwareSerial PMSerial(2, 3); // RX, TX
+//SoftwareSerial PMSerial(3, 2); // RX, TX
 
-void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
+void setup()
+{
+  PMSerial.begin(9600);
+  PMSerial.setTimeout(1500);
+  Serial.begin(115200);
 }
 
-//struct que armazena os valores do buffer
-struct pms5003data {
-  uint16_t framelen;
-  uint16_t pm10_standard, pm25_standard, pm100_standard;
-  uint16_t pm10_env, pm25_env, pm100_env;
-  uint16_t particles_03um, particles_05um, particles_10um, particles_25um, particles_50um, particles_100um;
-  uint16_t unused;
-  uint16_t checksum;
-};
- 
-struct pms5003data data;
+void loop()
+{
+  if(PMSerial.find(0x42)){
+    delay(100);
+    PMSerial.readBytes(buf,LENG);
 
-void loop() {
-    static unsigned long timer;
-    if(millis() - timer >=intervalo){ //timer para registar as amostras
-      if(readPMSdata(&pmsSerial)){ //leitura do sensor
-        //Print de PM2.5
-        Serial.println(data.pm25_standard);
+    if(buf[0] == 0x4d){
+      if(checkValue(buf,LENG)){
+        PM01Value=transmitPM01(buf); //count PM1.0 value of the air detector module
+        PM2_5Value=transmitPM2_5(buf);//count PM2.5 value of the air detector module
+        PM10Value=transmitPM10(buf); //count PM10 value of the air detector module
       }
-      timer=millis();
     }
+  }
+
+  static unsigned long OledTimer=millis();
+    if (millis() - OledTimer >=1000)
+    {
+      OledTimer=millis();
+
+      Serial.print("PM1.0: ");
+      Serial.print(PM01Value);
+      Serial.println("  ug/m3");
+
+      Serial.print("PM2.5: ");
+      Serial.print(PM2_5Value);
+      Serial.println("  ug/m3");
+
+      Serial.print("PM1 0: ");
+      Serial.print(PM10Value);
+      Serial.println("  ug/m3");
+      Serial.println();
+    }
+
 }
 
-boolean readPMSdata(SoftwareSerial *s) {
-  if (! s->available()) {
-    return false;
-    Serial.println("Availability fail"); //debugging
+char checkValue(unsigned char *thebuf, char leng)
+{
+  char receiveflag=0;
+  int receiveSum=0;
+
+  for(int i=0; i<(leng-2); i++){
+  receiveSum=receiveSum+thebuf[i];
   }
-  
-  // Read a byte at a time until we get to the special '0x42' start-byte
-  if (s->peek() != 0x42) {
-    s->read();
-    return false;
-    Serial.println("0x42 fail"); //debugging
+  receiveSum=receiveSum + 0x42;
+
+  if(receiveSum == ((thebuf[leng-2]<<8)+thebuf[leng-1]))  //check the serial data
+  {
+    receiveSum = 0;
+    receiveflag = 1;
   }
- 
-  // Now read all 32 bytes
-  if (s->available() < 32) {
-    return false;
-    Serial.println("Byte Check fail"); //debugging
-  }
-    
-  uint8_t buffer[32];    
-  uint16_t sum = 0;
-  s->readBytes(buffer, 32);
- 
-  // get checksum ready
-  for (uint8_t i=0; i<30; i++) {
-    sum += buffer[i];
-  }
- 
-  // debugging
-  for (uint8_t i=2; i<32; i++) {
-    Serial.print("0x"); Serial.print(buffer[i], HEX); Serial.print(", ");
-  }
-  Serial.println();
-  
-  
-  // The data comes in endian'd, this solves it so it works on all platforms
-  uint16_t buffer_u16[15];
-  for (uint8_t i=0; i<15; i++) {
-    buffer_u16[i] = buffer[2 + i*2 + 1];
-    buffer_u16[i] += (buffer[2 + i*2] << 8);
-  }
- 
-  // put it into a nice struct :)
-  memcpy((void *)&data, (void *)buffer_u16, 30);
- 
-  if (sum != data.checksum) {
-    Serial.println("Checksum failure"); //debugging
-    return false;
-  }
-  // success!
-  return true;
+  return receiveflag;
+}
+
+int transmitPM01(unsigned char *thebuf)
+{
+  int PM01Val;
+  PM01Val=((thebuf[3]<<8) + thebuf[4]); //count PM1.0 value of the air detector module
+  return PM01Val;
+}
+
+//transmit PM Value to PC
+int transmitPM2_5(unsigned char *thebuf)
+{
+  int PM2_5Val;
+  PM2_5Val=((thebuf[5]<<8) + thebuf[6]);//count PM2.5 value of the air detector module
+  return PM2_5Val;
+}
+
+//transmit PM Value to PC
+int transmitPM10(unsigned char *thebuf)
+{
+  int PM10Val;
+  PM10Val=((thebuf[7]<<8) + thebuf[8]); //count PM10 value of the air detector module
+  return PM10Val;
 }
