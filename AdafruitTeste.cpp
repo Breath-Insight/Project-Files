@@ -1,6 +1,8 @@
 #include <Adafruit_PM25AQI.h>
 #include <SoftwareSerial.h>
-SoftwareSerial pmSerial(2, 3);
+
+SoftwareSerial PMSerial(2, 3); // RX, TX
+//SoftwareSerial PMSerial(3, 2); // RX, TX
 
 // Intervalo de tempo entre amostras
 #define INTERVAL 1000
